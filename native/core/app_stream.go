@@ -256,7 +256,16 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 		session.mu.Unlock()
 		sort.Strings(ids)
 		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("asset 不存在 id=%s session资产=%d %v", parts[1], assetCount, ids)})
-		http.Error(writer, fmt.Sprintf("asset不存在 请求id=%s\nsession资产(%d):\n%s", parts[1], assetCount, strings.Join(ids, "\n")), http.StatusNotFound)
+		// [红果漫剧补丁] 十六进制级对比：请求键 vs 实际键（揪出隐藏字符/编码差异）
+		hexKeys := make([]string, 0, assetCount)
+		session.mu.Lock()
+		for assetID := range session.assets {
+			hexKeys = append(hexKeys, fmt.Sprintf("%x", assetID))
+		}
+		session.mu.Unlock()
+		sort.Strings(hexKeys)
+		http.Error(writer, fmt.Sprintf("asset不存在 请求id=%q len=%d hex=%x\nsession资产(%d) hex:\n%s",
+			parts[1], len(parts[1]), parts[1], assetCount, strings.Join(hexKeys, "\n")), http.StatusNotFound)
 		return
 	}
 	ctx, cancel := context.WithCancel(providerMediaContext(request.Context(), session.credentials))
