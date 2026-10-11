@@ -232,13 +232,16 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	}
 	stream.mu.Unlock()
 	if session == nil {
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("session 不存在 token=%s 路径=%s 存活session=%d", parts[0], request.URL.Path, func() int { stream.mu.Lock(); defer stream.mu.Unlock(); return len(stream.sessions) }())})
 		http.Error(writer, "播放已结束", http.StatusGone)
 		return
 	}
 	session.mu.Lock()
 	asset, found := session.assets[parts[1]]
+	assetCount := len(session.assets)
 	session.mu.Unlock()
 	if !found {
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("asset 不存在 id=%s session资产=%d 请求路径=%s", parts[1], assetCount, request.URL.Path)})
 		http.NotFound(writer, request)
 		return
 	}
