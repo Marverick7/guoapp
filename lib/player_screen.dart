@@ -233,9 +233,22 @@ class _PlayerScreenState extends State<PlayerScreen>
     _configurePictureInPicture();
     _subscriptions.add(
       _player.stream.error.listen((error) {
+        // [红果漫剧补丁] 错误全量入日记（此前被静默吞掉，无法排障）
+        if (error.trim().isNotEmpty) {
+          DiaryService.add('[MPV] 播放错误: $error');
+        }
         if (_enhancement.handlePlaybackError(error)) return;
         if (!_closed && _acceptErrors && mounted && error.trim().isNotEmpty) {
           _queueRecovery();
+        }
+      }),
+    );
+    // [红果漫剧补丁] libmpv 内部日志（error/warn）入日记，排障用
+    _subscriptions.add(
+      _player.stream.log.listen((log) {
+        final lvl = log.level.toLowerCase();
+        if (lvl == 'error' || lvl == 'fatal' || lvl == 'warn') {
+          DiaryService.add('[MPV:${log.prefix}] ${log.level} ${log.text}');
         }
       }),
     );
@@ -1046,7 +1059,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         _plan = plan;
         installed = true;
         _acceptErrors = true;
-        DiaryService.add('[Play] 调用 _player.open: url=${plan.url}, headers=${plan.headers.keys.toList()}');
+        DiaryService.add('[Play] open(${plan.routeIndex + 1}/${plan.routeCount}) url=${plan.url} '
+            'key=${plan.decryptionKey.isEmpty ? '无' : '有(${plan.decryptionKey.length}hex)'} '
+            'quality=${plan.quality} local=${plan.local} headers=${plan.headers.keys.toList()}');
         await _player.open(
           Media(
             plan.url,
