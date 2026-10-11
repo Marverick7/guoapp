@@ -180,17 +180,18 @@ class _PlayerScreenState extends State<PlayerScreen>
     _danmaku = DanmakuController(widget.repository)
       ..setEnabled(_danmakuEnabled);
     widget.store.addListener(_accessChanged);
+    // [红果漫剧补丁] 安卓改走 media_kit(libmpv)：libmpv 原生支持 CENC 解密
+    // （demuxer-lavf-o 传 decryption_key，见下方 NativePlayer 段），
+    // 旧 LunaExoPlayer(video_player) 无任何 DRM 接口，红果全量加密流必然黑屏。
     _player =
         widget.playerFactory?.call() ??
-        (Platform.isAndroid
-            ? LunaExoPlayer()
-            : Player(
-                configuration: const PlayerConfiguration(
-                  bufferSize: 32 * 1024 * 1024,
-                  logLevel: MPVLogLevel.error,
-                ),
-              ));
-    _video = widget.videoBuilder == null && !Platform.isAndroid
+        Player(
+          configuration: const PlayerConfiguration(
+            bufferSize: 32 * 1024 * 1024,
+            logLevel: MPVLogLevel.error,
+          ),
+        );
+    _video = widget.videoBuilder == null
         ? VideoController(
             _player,
             configuration: VideoControllerConfiguration(
