@@ -238,7 +238,9 @@ class _PlayerScreenState extends State<PlayerScreen>
           DiaryService.add('[MPV] 播放错误: $error');
         }
         // [红果漫剧补丁] 代理自检：mpv 打不开本地代理 URL 时，Dart 亲自请求一次，
-        // 把代理的真实状态码与错误正文抓进日记（定位是代理挂了还是上游挂了）
+        // 把代理的真实状态码与错误正文抓进日记（定位是代理挂了还是上游挂了）。
+        // 注意：mpv 错误文本以英文句号收尾，正则要排除尾部标点，否则请求的 URL
+        // 多一个点 → 探针自己造出假 404（diag7 血泪教训）。
         if (error.contains('Failed to open http://127.0.0.1')) {
           unawaited(_probeProxy(error));
         }
@@ -1471,7 +1473,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   // [红果漫剧补丁] 本地代理自检探针
   HttpClient? _probeClient;
   Future<void> _probeProxy(String error) async {
-    final match = RegExp(r'http://127\.0\.0\.1:\d+/\S+').firstMatch(error);
+    final match = RegExp(r'http://127\.0\.0\.1:\d+/[A-Za-z0-9/.]+(?<![.,;:!?])')
+        .firstMatch(error);
     if (match == null) return;
     final url = match.group(0)!;
     _probeClient?.close(force: true);
