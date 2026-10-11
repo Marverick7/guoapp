@@ -108,7 +108,9 @@ func (stream *nativeStreamServer) nativeOpen(media providerMedia) (string, strin
 		entry.data = []byte(media.Playlist)
 		entry.contentType = "application/vnd.apple.mpegurl"
 	}
-	return stream.nativeAsset(token, session, entry), token
+	registered := stream.nativeAsset(token, session, entry)
+	stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.open", Level: "info", Message: fmt.Sprintf("token=%s… url尾=%s playlistLen=%d hlsKey=%d isHLS=%v contentType=%s dataLen=%d", token[:12], registered[len(registered)-14:], len(media.Playlist), len(media.HLSKey), isHLS, entry.contentType, len(entry.data))})
+	return registered, token
 }
 
 func (stream *nativeStreamServer) nativeRelease(token string) {
@@ -352,7 +354,12 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 		}
 		text := strings.TrimSpace(strings.TrimPrefix(string(body), "\ufeff"))
 		if !strings.HasPrefix(text, "#EXTM3U") {
-			http.Error(writer, "播放列表无效", http.StatusBadGateway)
+			// [红果漫剧补丁] 带上游响应前 96 字节（探针可见），定性上游到底回了什么
+			preview := text
+			if len(preview) > 96 {
+				preview = preview[:96]
+			}
+			http.Error(writer, fmt.Sprintf("播放列表无效(非#EXTM3U) ct=%s 前96字节=%q", contentType, preview), http.StatusBadGateway)
 			return
 		}
 		rewritten, err := stream.nativeRewrite(parts[0], session, text, finalURL.String())
