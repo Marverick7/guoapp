@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -246,9 +247,16 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	assetCount := len(session.assets)
 	session.mu.Unlock()
 	if !found {
-		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("asset 不存在 id=%s session资产=%d", parts[1], assetCount)})
-		// [红果漫剧补丁] 响应体直接带诊断（Dart 探针会原样显示）
-		http.Error(writer, fmt.Sprintf("asset不存在 id=%s… session资产=%d", parts[1][:12], assetCount), http.StatusNotFound)
+		// [红果漫剧补丁] 列出 session 内全部资产 id + 各自地址（定性 404：没注册 vs id 错位 vs 换了地址）
+		ids := make([]string, 0, assetCount)
+		session.mu.Lock()
+		for assetID, a := range session.assets {
+			ids = append(ids, fmt.Sprintf("%s(%s)", assetID[:12], a.address))
+		}
+		session.mu.Unlock()
+		sort.Strings(ids)
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("asset 不存在 id=%s session资产=%d %v", parts[1], assetCount, ids)})
+		http.Error(writer, fmt.Sprintf("asset不存在 请求id=%s\nsession资产(%d):\n%s", parts[1], assetCount, strings.Join(ids, "\n")), http.StatusNotFound)
 		return
 	}
 	ctx, cancel := context.WithCancel(providerMediaContext(request.Context(), session.credentials))
