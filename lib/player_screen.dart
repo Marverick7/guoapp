@@ -237,6 +237,11 @@ class _PlayerScreenState extends State<PlayerScreen>
         if (error.trim().isNotEmpty) {
           DiaryService.add('[MPV] 播放错误: $error');
         }
+        // [红果漫剧补丁] 代理自检：mpv 打不开本地代理 URL 时，Dart 亲自请求一次，
+        // 把代理的真实状态码与错误正文抓进日记（定位是代理挂了还是上游挂了）
+        if (error.contains('Failed to open http://127.0.0.1')) {
+          unawaited(_probeProxy(error));
+        }
         if (_enhancement.handlePlaybackError(error)) return;
         if (!_closed && _acceptErrors && mounted && error.trim().isNotEmpty) {
           _queueRecovery();
@@ -1460,6 +1465,38 @@ class _PlayerScreenState extends State<PlayerScreen>
       _rotate();
     } else {
       Navigator.of(context).maybePop();
+    }
+  }
+
+  // [红果漫剧补丁] 本地代理自检探针
+  HttpClient? _probeClient;
+  Future<void> _probeProxy(String error) async {
+    final match = RegExp(r'http://127\.0\.0\.1:\d+/\S+').firstMatch(error);
+    if (match == null) return;
+    final url = match.group(0)!;
+    _probeClient?.close(force: true);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 3);
+    _probeClient = client;
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      request.headers.set('Range', 'bytes=0-256');
+      final response =
+          await request.close().timeout(const Duration(seconds: 6));
+      final builder = BytesBuilder();
+      await for (final chunk in response) {
+        builder.add(chunk);
+        if (builder.length > 400) break;
+      }
+      unawaited(response.drain<void>().catchError((Object _) {}));
+      final body =
+          utf8.decode(builder.takeBytes(), allowMalformed: true);
+      DiaryService.add('[Probe] 代理自检: status=${response.statusCode} '
+          'ct=${response.headers.contentType} body=${body.isEmpty ? '(空)' : body}');
+    } catch (e) {
+      DiaryService.add('[Probe] 代理自检失败: $e');
+    } finally {
+      client.close(force: true);
     }
   }
 

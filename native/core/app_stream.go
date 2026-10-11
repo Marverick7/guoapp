@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -274,7 +275,8 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	}
 	upstream, err := http.NewRequestWithContext(ctx, request.Method, asset.address, nil)
 	if err != nil {
-		http.Error(writer, "媒体地址无效", http.StatusBadGateway)
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.upstream_invalid", Level: "error", Message: err.Error(), Host: asset.address})
+		http.Error(writer, "媒体地址无效: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	upstream.Header.Set("User-Agent", userAgent)
@@ -286,14 +288,16 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	}
 	response, err := stream.nativeRequest(upstream)
 	if err != nil {
-		http.Error(writer, "读取媒体失败，请重试", http.StatusBadGateway)
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.upstream_error", Level: "error", Message: err.Error(), Host: asset.address})
+		http.Error(writer, "读取媒体失败: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusPartialContent {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
 		err := stream.downloader.catalogResponseError(upstream, response, body)
-		http.Error(writer, err.Error(), response.StatusCode)
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.upstream_status", Level: "error", Message: err.Error(), Host: asset.address, HTTPStatus: response.StatusCode})
+		http.Error(writer, fmt.Sprintf("上游 %d: %s", response.StatusCode, err.Error()), response.StatusCode)
 		return
 	}
 	contentType := strings.ToLower(response.Header.Get("Content-Type"))
