@@ -1486,9 +1486,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       final builder = BytesBuilder();
       await for (final chunk in response) {
         builder.add(chunk);
-        if (builder.length > 400) break;
+        if (builder.length > 600) break;
       }
-      unawaited(response.drain<void>().catchError((Object _) {}));
+      // 注意：不要 drain！await-for break 后订阅已取消，drain 会二次 listen 抛
+      // "Stream has already been listened to"，把已拿到的状态码/正文一起吞掉。
       final body =
           utf8.decode(builder.takeBytes(), allowMalformed: true);
       DiaryService.add('[Probe] 代理自检: status=${response.statusCode} '
