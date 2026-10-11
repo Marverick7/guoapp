@@ -222,7 +222,8 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	}
 	parts := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
 	if len(parts) != 2 {
-		http.NotFound(writer, request)
+		// [红果漫剧补丁] 带实际路径段数，Dart 探针可见
+		http.Error(writer, fmt.Sprintf("路径段数=%d path=%s", len(parts), request.URL.Path), http.StatusNotFound)
 		return
 	}
 	stream.mu.Lock()
@@ -232,8 +233,12 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	}
 	stream.mu.Unlock()
 	if session == nil {
-		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("session 不存在 token=%s 路径=%s 存活session=%d", parts[0], request.URL.Path, func() int { stream.mu.Lock(); defer stream.mu.Unlock(); return len(stream.sessions) }())})
-		http.Error(writer, "播放已结束", http.StatusGone)
+		stream.mu.Lock()
+		alive := len(stream.sessions)
+		stream.mu.Unlock()
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("session 不存在 token=%s 存活session=%d", parts[0], alive)})
+		// [红果漫剧补丁] 响应体直接带诊断（Dart 探针会原样显示）
+		http.Error(writer, fmt.Sprintf("播放已结束(token=%s… 存活session=%d)", parts[0][:12], alive), http.StatusGone)
 		return
 	}
 	session.mu.Lock()
@@ -241,8 +246,9 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	assetCount := len(session.assets)
 	session.mu.Unlock()
 	if !found {
-		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("asset 不存在 id=%s session资产=%d 请求路径=%s", parts[1], assetCount, request.URL.Path)})
-		http.NotFound(writer, request)
+		stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.serve_miss", Level: "error", Message: fmt.Sprintf("asset 不存在 id=%s session资产=%d", parts[1], assetCount)})
+		// [红果漫剧补丁] 响应体直接带诊断（Dart 探针会原样显示）
+		http.Error(writer, fmt.Sprintf("asset不存在 id=%s… session资产=%d", parts[1][:12], assetCount), http.StatusNotFound)
 		return
 	}
 	ctx, cancel := context.WithCancel(providerMediaContext(request.Context(), session.credentials))
