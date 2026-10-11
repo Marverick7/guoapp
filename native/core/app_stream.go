@@ -354,7 +354,20 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 		}
 		text := strings.TrimSpace(strings.TrimPrefix(string(body), "\ufeff"))
 		if !strings.HasPrefix(text, "#EXTM3U") {
-			// [红果漫剧补丁] 带上游响应前 96 字节（探针可见），定性上游到底回了什么
+			// [红果漫剧补丁] 上游 .m3u8 被 CDN 重定向/降级成 MP4 直链（ftyp 开头）。
+			// 此时 asset 键尾是 .m3u8 但内容是 MP4 —— 不再报错，直接按 MP4 透传：
+			// mpv + decryption_key 本来就能边下边解 CENC mp4。
+			if len(body) >= 12 && string(body[4:8]) == "ftyp" {
+				stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.m3u8_downgraded_to_mp4", Level: "warning", Message: "上游以 MP4 直链响应 .m3u8 地址，已按 MP4 透传", Host: asset.address})
+				writer.Header().Set("Content-Type", "video/mp4")
+				writer.Header().Set("Accept-Ranges", "bytes")
+				if request.Method == http.MethodHead {
+					writer.WriteHeader(http.StatusOK)
+					return
+				}
+				http.ServeContent(writer, request, "video.mp4", time.Time{}, bytes.NewReader(body))
+				return
+			}
 			preview := text
 			if len(preview) > 96 {
 				preview = preview[:96]
