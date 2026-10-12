@@ -352,19 +352,13 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 		// 必须在读全量前就识别，否则先撞「播放列表过大」的 502。
 		peekBytes, _ := reader.Peek(12)
 		if len(peekBytes) >= 12 && string(peekBytes[4:8]) == "ftyp" {
-			stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.m3u8_downgraded_to_mp4", Level: "warning", Message: "上游以 MP4 直链响应 .m3u8 地址，302 到 .mp4 别名", Host: asset.address})
-			alias := stream.nativeAsset(parts[0], session, nativeStreamAsset{
-				address:     asset.address,
-				contentType: "video/mp4",
-				etag:        asset.etag,
-				modified:    asset.modified,
-			})
-			if request.Method == http.MethodHead {
-				writer.Header().Set("Location", alias)
-				writer.WriteHeader(http.StatusFound)
-				return
-			}
-			http.Redirect(writer, request, alias, http.StatusFound)
+			// [红果漫剧补丁] 直接 302 到上游 CDN 直链：mpv 持有 media_kit 注入的
+			// Referer/UA 头，CDN 原生处理 Range/seek。此前经代理中转 serve 的
+			// mp4 别名在真机上 seek 连发失败（size -38 → demuxer fatal）——
+			// 代理 stream 层的 Range 透传不可靠，不再参与 mp4 数据面。
+			stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.m3u8_downgraded_to_mp4", Level: "warning", Message: "上游以 MP4 直链响应 .m3u8 地址，302 直连 CDN", Host: asset.address})
+			writer.Header().Set("Cache-Control", "no-store")
+			http.Redirect(writer, request, asset.address, http.StatusFound)
 			return
 		}
 		body, err := io.ReadAll(io.LimitReader(reader, 4<<20+1))

@@ -34,7 +34,17 @@ Future<void> openPlaybackDirectly(
       throw AppFailure('暂时没有可播放的集数');
     }
     final watched = store.watched(mergedDrama.id);
-    final index = resumeEpisodeIndex(merged.episodes, watched);
+    // [红果漫剧补丁] 点剧=从【上次看到的同一集】继续（集内断点续播），
+    // 不再自动 +1 跳下一集；没看过的剧从第 1 集。
+    // （上游 resumeEpisodeIndex 会返回记录集+1，且看完标记后连第一集都回不去。）
+    final int index;
+    if (watched == null) {
+      index = 0;
+    } else {
+      final current = merged.episodes
+          .indexWhere((item) => item.number == watched.episode);
+      index = current >= 0 ? current : 0;
+    }
     final episode = merged.episodes[index];
     if (episode.vip && mergedDrama.source != SourceSite.dsd.id) {
       final accepted = await showDialog<bool>(
@@ -57,8 +67,11 @@ Future<void> openPlaybackDirectly(
       if (accepted != true || !context.mounted) return;
     }
     final position =
-        watched?.episode == episode.number && watched?.finished == false
-        ? watched!.position
+        watched != null &&
+            watched.episode == episode.number &&
+            !watched.finished &&
+            watched.position > 0
+        ? watched.position
         : 0.0;
     if (!context.mounted || profileEpoch != store.profileEpoch) return;
     await Navigator.of(context).push(

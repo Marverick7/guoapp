@@ -124,15 +124,15 @@ class _DetailScreenState extends State<DetailScreen> {
           detail.episodes.isNotEmpty) {
         _initialActionHandled = true;
         if (widget.resumeOnOpen) {
-          unawaited(
-            _play(
-              resumeEpisodeIndex(
-                detail.episodes,
-                widget.store.watched(merged.id),
-              ),
-              resume: true,
-            ),
-          );
+          // [红果漫剧补丁] 同 resumeEpisodeIndex 但不 +1：从记录集继续
+          final watched = widget.store.watched(merged.id);
+          int resumeAt = 0;
+          if (watched != null) {
+            final current = detail.episodes
+                .indexWhere((item) => item.number == watched.episode);
+            if (current >= 0) resumeAt = current;
+          }
+          unawaited(_play(resumeAt, resume: true));
         } else if (widget.downloadOnOpen && widget.store.canDownload) {
           unawaited(_download());
         }
@@ -318,7 +318,14 @@ class _DetailScreenState extends State<DetailScreen> {
     final drama = _detail?.drama ?? widget.drama;
     final watched = widget.store.watched(drama.id);
     final episodes = _detail?.episodes ?? <Episode>[];
-    final resumeIndex = resumeEpisodeIndex(episodes, watched);
+    // [红果漫剧补丁] 「继续播放」按钮：定位到记录集本身（不 +1）
+    final int resumeIndex;
+    if (watched == null) {
+      resumeIndex = 0;
+    } else {
+      final current = episodes.indexWhere((item) => item.number == watched.episode);
+      resumeIndex = current >= 0 ? current : 0;
+    }
     final television = AppLayout.isTelevision(context);
     final allowed =
         widget.store.profileEpoch == _profileEpoch &&
