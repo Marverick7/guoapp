@@ -165,7 +165,9 @@ class LocalStore extends ChangeNotifier {
         RegExp(r'^[a-f0-9]{32}$').hasMatch(salt) &&
         RegExp(r'^[a-f0-9]{64}$').hasMatch(hash);
     _gateEnabled = valid;
-    _gateOff = !valid && off;
+    // [红果漫剧补丁] 真果鉴（--all-sources）未设密码时默认显示全部站源：
+    // 用户未配置过密码锁（!valid）时，真果鉴强制 gateOff=true；红果鉴保持上游行为。
+    _gateOff = !valid && (off || allSourcesEnabled);
     _gateSalt = valid ? salt : '';
     _gateHash = valid ? hash : '';
     _sourcesUnlocked = false;
