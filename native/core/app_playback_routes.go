@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 )
@@ -94,6 +95,8 @@ func (engine *nativeEngine) nativeOpenPlayback(ctx context.Context, choice nativ
 		if err != nil {
 			return nativePlan{}, err
 		}
+		// [红果漫剧补丁] 打点：nativeOpen 实际收到的 URL 形态（定案 .m3u8 之谜）
+		engine.downloader.recordDiagnostic(diagnosticEvent{Event: "hongguo.native_open", Level: "info", Message: fmt.Sprintf("media.URL尾=%s playlistLen=%d", media.URL[max(0, len(media.URL)-16):], len(media.Playlist))})
 		plan.URL, choice.streamSession = stream.nativeOpen(media)
 	}
 	choice.created = time.Now()
