@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:media_kit/media_kit.dart';
@@ -24,7 +25,7 @@ import 'diary_service.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  DiaryService.add('[App] 应用启动，版本: 0.2.82+89, 平台: ${Platform.operatingSystem}');
+  DiaryService.add('[App] 应用启动，版本: 0.2.83+90, 平台: ${Platform.operatingSystem}');
   if (Platform.isAndroid) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemBars(Brightness.dark));
@@ -114,11 +115,18 @@ class _AppBootstrapState extends State<AppBootstrap>
     });
     try {
       final preferences = await SharedPreferences.getInstance();
+      // [红果漫剧补丁] 取本地存储目录，供「无法保存」时向用户展示具体路径
+      // （Windows 上 shared_preferences 落在 %APPDATA%\<app>\ 下）
+      String storagePath = '';
+      try {
+        final support = await getApplicationSupportDirectory();
+        storagePath = support.path;
+      } catch (_) {}
       await _refreshDevice();
       await repository.initialize();
       if (mounted) {
         setState(() {
-          store = LocalStore(preferences);
+          store = LocalStore(preferences, storagePath: storagePath);
           repository.access = store;
           MediaLibrary.attach(repository, store!);
           LanController.current?.dispose();

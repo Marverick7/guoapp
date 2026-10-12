@@ -21,9 +21,14 @@ class LocalStore extends ChangeNotifier {
   LocalStore(
     this.preferences, {
     Future<String> Function(String, String)? pinHasher,
+    this.storagePath = '',
   }) : _pinHasher = pinHasher ?? hashProfilePin {
     _initialize();
   }
+
+  /// [红果漫剧补丁] 本地存储文件所在目录（Windows 上用于把「无法保存」的
+  /// 具体路径告诉用户，便于定位只读目录 / 安全软件拦截）。
+  final String storagePath;
 
   final SharedPreferences preferences;
   final Future<String> Function(String pin, String salt) _pinHasher;
@@ -56,7 +61,7 @@ class LocalStore extends ChangeNotifier {
 
   void _initialize() {
     try {
-      _snapshot = LocalSnapshot(preferences);
+      _snapshot = LocalSnapshot(preferences, storagePath: storagePath);
       final raw = _snapshot!.getString('profiles');
       if (raw == null &&
           (_snapshot!.getString('activeProfile') != null ||

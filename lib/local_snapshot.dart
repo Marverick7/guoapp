@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalSnapshot {
-  LocalSnapshot(this.preferences) {
+  LocalSnapshot(this.preferences, {this.storagePath = ''}) {
     reloadValues();
   }
-  LocalSnapshot.empty(this.preferences);
+  LocalSnapshot.empty(this.preferences, {this.storagePath = ''});
+
+  /// [红果漫剧补丁] 存储目录（用于把保存失败的具体路径告知用户）
+  final String storagePath;
 
   static const storageKey = 'localSnapshot.v1';
   static const libraryKeys = {
@@ -126,7 +129,12 @@ class LocalSnapshot {
       } catch (_) {
         throw const SnapshotRecoveryRequired();
       }
-      throw StateError('未能保存，原有记录已保留；请检查存储空间和权限后重试');
+      throw StateError(
+        '未能保存，原有记录已保留。'
+        '${storagePath.isEmpty ? '' : '存储位置：$storagePath。'}'
+        '请确认该目录可写（不要解压到 Program Files 等受保护位置），'
+        '并检查杀毒软件/安全中心是否拦截了写入。',
+      );
     }
     _values = Map.of(values);
   }
