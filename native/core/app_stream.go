@@ -97,11 +97,19 @@ func (stream *nativeStreamServer) nativeOpen(media providerMedia) (string, strin
 	stream.sessions[token] = session
 	stream.mu.Unlock()
 	entry := nativeStreamAsset{address: media.URL, contentType: "video/mp4"}
-	isHLS := media.Playlist != "" || len(media.HLSKey) > 0 || strings.Contains(strings.ToLower(media.URL), "m3u8") || strings.Contains(strings.ToLower(media.URL), "hls")
-	if isHLS {
-		entry.contentType = "application/vnd.apple.mpegurl"
+	// [红果漫剧补丁] 严格判定 HLS：只看 path 后缀 / 清单内容 / HLS 密钥。
+	// 旧版用 strings.Contains(URL, "hls") 宽松匹配 —— 实测红果 CDN 的 MP4 直链
+	// URL 第 415 位恰好含 "hls" 子串（base64 参数巧合）→ MP4 被误标 mpegurl →
+	// 假 .m3u8 尾 → mpv 用 HLS demuxer 解 MP4 → seek 全失败 → 播放器跳集。
+	pathIsM3u8 := false
+	if parsed, err := url.Parse(media.URL); err == nil {
+		// 只看 path：既覆盖 .m3u8 后缀，也覆盖 /hls/ 路径，但不误命中 query 里
+		// base64 参数的巧合子串（红果 CDN 的 mp4 直链就在 query 第 415 位含 "hls"）。
+		pathLower := strings.ToLower(parsed.Path)
+		pathIsM3u8 = strings.Contains(pathLower, "m3u8") || strings.Contains(pathLower, "hls")
 	}
-	if parsed, err := url.Parse(media.URL); err == nil && strings.HasSuffix(strings.ToLower(parsed.Path), ".m3u8") {
+	isHLS := media.Playlist != "" || len(media.HLSKey) > 0 || pathIsM3u8
+	if isHLS {
 		entry.contentType = "application/vnd.apple.mpegurl"
 	}
 	if media.Playlist != "" {
@@ -333,7 +341,10 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	if response.Request != nil && response.Request.URL != nil {
 		finalURL = response.Request.URL
 	}
-	playlist := strings.Contains(asset.contentType, "mpegurl") || strings.Contains(contentType, "mpegurl") || strings.HasSuffix(strings.ToLower(finalURL.Path), ".m3u8") || strings.Contains(strings.ToLower(finalURL.String()), "m3u8") || len(session.key) > 0
+	// [红果漫剧补丁] 同 nativeOpen：只认 path 后缀与 mpegurl content-type，
+	// 不用 URL 任意位置子串（会误命中 base64 参数里的巧合子串）。
+	finalPath := strings.ToLower(finalURL.Path)
+	playlist := strings.Contains(asset.contentType, "mpegurl") || strings.Contains(contentType, "mpegurl") || strings.Contains(finalPath, "m3u8") || strings.Contains(finalPath, "hls") || len(session.key) > 0
 	reader := bufio.NewReader(response.Body)
 	if !playlist && request.Method == http.MethodGet {
 		peek, _ := reader.Peek(512)
