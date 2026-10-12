@@ -200,23 +200,47 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	}
 	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
 	if nativeErr == nil {
-		return media, nil
+		return d.finalizeHongguoMedia(ctx, media)
 	}
 	if err := ctx.Err(); err != nil {
 		return providerMedia{}, err
 	}
 	media, pageErr := d.resolveHongguoWebMedia(ctx, seriesID, videoID)
 	if pageErr == nil {
-		return media, nil
+		return d.finalizeHongguoMedia(ctx, media)
 	}
 	if err := ctx.Err(); err != nil {
 		return providerMedia{}, err
 	}
 	media, apiErr := d.resolveHongguoPlaybackAPI(ctx, seriesID, videoID)
 	if apiErr == nil {
-		return media, nil
+		return d.finalizeHongguoMedia(ctx, media)
 	}
 	return providerMedia{}, fmt.Errorf("红果 App 取流失败：%v；网页取流失败：%v；备用取流失败：%w", publicError(nativeErr), publicError(pageErr), apiErr)
+}
+
+// [红果漫剧补丁] 红果三路回退的统一出口：main_url 常为 .m3u8（内含多个 4MB CDN
+// 分片）。此前红果路径直接 return，绕过了 resolveProviderMedia 的清单拉取 →
+// Playlist 空 → 代理把首个 4MB 分片当整集 302 给播放器 → seek 出界 → fatal
+// → 播放器跳集。此处对 .m3u8 拉取并填充 Playlist，让代理按 HLS 重写整集分片。
+func (d *Downloader) finalizeHongguoMedia(ctx context.Context, media providerMedia) (providerMedia, error) {
+	parsed, err := url.Parse(media.URL)
+	if err != nil || !strings.HasSuffix(strings.ToLower(parsed.Path), ".m3u8") {
+		return media, nil
+	}
+	playlist, finalURL, err := d.fetchMediaPlaylist(ctx, media.URL, media.Referer)
+	if err != nil {
+		return providerMedia{}, fmt.Errorf("获取红果播放列表失败: %w", err)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(strings.TrimPrefix(playlist, "\ufeff")), "#EXTM3U") {
+		return providerMedia{}, errors.New("红果未返回有效 M3U8，可能需要登录或链接已失效")
+	}
+	if duration := m3u8Duration(playlist); duration > 0 {
+		media.Duration = duration
+	}
+	media.Playlist = playlist
+	media.URL = finalURL
+	return media, nil
 }
 
 func (d *Downloader) resolveHongguoWebMedia(ctx context.Context, seriesID, videoID string) (providerMedia, error) {

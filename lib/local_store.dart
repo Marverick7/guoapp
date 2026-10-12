@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'local_profiles.dart';
 import 'local_snapshot.dart';
+import 'app_build.dart';
 import 'models.dart';
 import 'playback_preferences.dart';
 import 'download_preferences.dart';
@@ -46,7 +47,9 @@ class LocalStore extends ChangeNotifier {
   int _failures = 0;
   bool _sourcesUnlocked = false;
   bool _gateEnabled = false;
-  bool _gateOff = false;
+  // [红果漫剧补丁] 真果鉴（--all-sources）默认全站源可见：密码锁默认关闭状态。
+  // 红果鉴保持上游行为（仅 4 个默认源）。
+  bool _gateOff = allSourcesEnabled;
   String _gateSalt = '';
   String _gateHash = '';
   DateTime _retryAfter = DateTime(2000);
