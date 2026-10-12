@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// 应用内「日记」日志服务 — 实时记录播放与系统事件，方便在电视与手机端快速排查问题。
 class DiaryService {
@@ -19,6 +23,50 @@ class DiaryService {
     }
     revision.value++;
     debugPrint('[Diary] $message');
+    unawaited(_persist(entry));
+  }
+
+  /// [红果漫剧补丁] 日记落盘：Windows/桌面端便于用户直接把日志文件发给我们排查。
+  /// 路径：<应用支持目录>/diary.log（Windows = %APPDATA%\duanju\duanju_app\）
+  /// 文件上限 2MB，超出后截断重写，避免无限增长。
+  static const int _maxLogBytes = 2 * 1024 * 1024;
+  static File? _logFile;
+  static Future<void>? _logInit;
+  static bool _logFailed = false;
+
+  static Future<File?> _resolveLogFile() async {
+    if (_logFile != null) return _logFile;
+    if (_logFailed) return null;
+    _logInit ??= () async {
+      try {
+        final dir = await getApplicationSupportDirectory();
+        await dir.create(recursive: true);
+        _logFile = File('${dir.path}${Platform.pathSeparator}diary.log');
+      } catch (_) {
+        _logFailed = true;
+      }
+    }();
+    await _logInit;
+    return _logFile;
+  }
+
+  static Future<void> _persist(String entry) async {
+    try {
+      final file = await _resolveLogFile();
+      if (file == null) return;
+      if (file.existsSync() && file.lengthSync() > _maxLogBytes) {
+        await file.writeAsString('--- 日志已截断 ---\n');
+      }
+      await file.writeAsString('$entry\n', mode: FileMode.append, flush: false);
+    } catch (_) {
+      _logFailed = true;
+    }
+  }
+
+  /// 日记文件路径（供界面展示，便于用户定位并发送）
+  static Future<String> logFilePath() async {
+    final file = await _resolveLogFile();
+    return file?.path ?? '（无法写入日志文件）';
   }
 
   /// 获取当前所有日记副本
@@ -52,7 +100,6 @@ class DiaryService {
     return showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        final scrollController = ScrollController();
         return AlertDialog(
           backgroundColor: const Color(0xFF1E1E24),
           shape: RoundedRectangleBorder(
@@ -88,7 +135,38 @@ class DiaryService {
           content: SizedBox(
             width: double.maxFinite,
             height: MediaQuery.of(dialogContext).size.height * 0.65,
-            child: AnimatedBuilder(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // [红果漫剧补丁] 显示日志文件路径：Windows 用户可直接去该目录取
+                // diary.log 发给开发者（内存日记上限 500 条，文件是完整记录）。
+                FutureBuilder<String>(
+                  future: logFilePath(),
+                  builder: (context, snapshot) {
+                    final pathText = snapshot.data;
+                    if (pathText == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: SelectableText(
+                        '日志文件：$pathText',
+                        style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                    );
+                  },
+                ),
+                Expanded(child: _buildEntryList(dialogContext)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 日记条目列表（从弹窗内容中抽出，便于在外层叠加「日志文件路径」）
+  static Widget _buildEntryList(BuildContext dialogContext) {
+    final scrollController = ScrollController();
+    return AnimatedBuilder(
               animation: revision,
               builder: (context, _) {
                 final list = entries;
@@ -155,22 +233,6 @@ class DiaryService {
                   ),
                 );
               },
-            ),
-          ),
-          actions: [
-            TextButton.icon(
-              icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('一键复制'),
-              onPressed: () => copyToClipboard(dialogContext),
-            ),
-            FilledButton(
-              autofocus: true,
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('关闭'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

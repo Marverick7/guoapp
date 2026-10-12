@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'local_profiles.dart';
+import 'diary_service.dart';
 import 'local_snapshot.dart';
 import 'app_build.dart';
 import 'models.dart';
@@ -502,6 +503,7 @@ class LocalStore extends ChangeNotifier {
     values.putIfAbsent('activeProfile', () => _current);
     try {
       await snapshot.commit(values);
+      _saveFailed = false;
       if (trackSync &&
           !replace &&
           {...changes.keys, ...remove}.any(
@@ -514,8 +516,16 @@ class LocalStore extends ChangeNotifier {
         if (syncUrgent) _lanUrgentRevision++;
       }
     } on SnapshotRecoveryRequired catch (error) {
+      // [红果漫剧补丁] 无法确认落盘：标记保存失败（reload 将保留内存态），
+      // 并写日记便于用户把日志发回排查（Windows 上多为存储目录不可写）。
+      _saveFailed = true;
+      DiaryService.add('[Store] 保存失败(RecoveryRequired): $error');
       _block(error.toString());
       _notify();
+      rethrow;
+    } catch (error) {
+      _saveFailed = true;
+      DiaryService.add('[Store] 保存失败: $error');
       rethrow;
     }
   }
@@ -1229,7 +1239,18 @@ class LocalStore extends ChangeNotifier {
     });
   }
 
+  /// [红果漫剧补丁] 最近一次保存是否失败（写盘不可用时置位）。
+  /// 保存失败时内存态是唯一真相，reload 不能拿磁盘旧值把它冲掉——
+  /// 这修复了 Windows「解锁后几秒又变回默认」（自动 worker 定时 reload 覆盖）。
+  bool _saveFailed = false;
+
+  bool get saveFailed => _saveFailed;
+
   Future<void> reload() => _queue(() async {
+    // 保存曾失败：跳过磁盘重载，保留内存态（否则解锁/设置会被旧值覆盖）
+    if (_saveFailed) {
+      return;
+    }
     final previousProfiles = _configurationError == null
         ? _string('profiles')
         : null;
