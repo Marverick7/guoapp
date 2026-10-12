@@ -139,7 +139,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   windows:
-    if: false
     needs: checks
     runs-on: windows-latest
     timeout-minutes: 45
@@ -193,8 +192,8 @@ jobs:
       - uses: actions/checkout@v4
 
   release:
-    needs: [android]
-    if: always() && needs.android.result == 'success'
+    needs: [android, windows]
+    if: always() && needs.android.result == 'success' && needs.windows.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

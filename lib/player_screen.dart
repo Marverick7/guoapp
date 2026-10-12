@@ -1789,6 +1789,10 @@ class _PlayerScreenState extends State<PlayerScreen>
             key: _videoPaneKey,
             fit: StackFit.expand,
             children: [
+              // [红果漫剧补丁] letterbox 兜底黑底：Video 用 BoxFit.contain 时，
+              // 视频比例与窗口不匹配会留边，未显式设底会露出未初始化纹理（Windows 上
+              // 呈绿色，且随视频比例不同而时有时无）。
+              const ColoredBox(color: Colors.black),
               if (widget.videoBuilder != null)
                 widget.videoBuilder!(layeredControls)
               else if (_player is LunaExoPlayer)
