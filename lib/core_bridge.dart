@@ -274,9 +274,9 @@ class NativeRepository extends AppRepository {
       if (!file.existsSync()) return;
       final lines = (await file.readAsString())
           .split('\n')
-          .where((l) => l.contains('hongguo.'))
+          .where((l) => l.contains('hongguo.') || l.contains('stream.'))
           .toList();
-      final show = lines.length > 5 ? lines.sublist(lines.length - 5) : lines;
+      final show = lines.length > 10 ? lines.sublist(lines.length - 10) : lines;
       for (final line in show) {
         final m = RegExp('"event":"([^"]+)"').firstMatch(line);
         final msg = RegExp('"message":"([^"]*)"').firstMatch(line);

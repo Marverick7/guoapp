@@ -385,6 +385,7 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 		}
 		body, err := io.ReadAll(io.LimitReader(reader, 4<<20+1))
 		if err != nil || len(body) > 4<<20 {
+			stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.playlist_read_fail", Level: "error", Host: asset.address, Message: fmt.Sprintf("err=%v len=%d", err, len(body))})
 			http.Error(writer, "播放列表过大或读取失败", http.StatusBadGateway)
 			return
 		}
@@ -394,10 +395,20 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 			if len(preview) > 96 {
 				preview = preview[:96]
 			}
+			stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.playlist_invalid", Level: "error", Host: asset.address, Message: fmt.Sprintf("ct=%s 前96字节=%q", contentType, preview)})
 			http.Error(writer, fmt.Sprintf("播放列表无效(非#EXTM3U) ct=%s 前96字节=%q", contentType, preview), http.StatusBadGateway)
 			return
 		}
 		rewritten, err := stream.nativeRewrite(parts[0], session, text, finalURL.String())
+		// [红果漫剧补丁] dump 改写后的清单头部（定位其他源播放失败时 mpv 收到了什么）
+		if err == nil {
+			head := rewritten
+			if len(head) > 320 {
+				head = head[:320]
+			}
+			stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.playlist_served", Level: "info", Host: asset.address,
+				Message: fmt.Sprintf("in=%d out=%d 头部=%q", len(text), len(rewritten), head)})
+		}
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadGateway)
 			return
