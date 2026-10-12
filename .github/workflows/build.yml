@@ -139,7 +139,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   windows:
-    if: false
     needs: checks
     runs-on: windows-latest
     timeout-minutes: 45
@@ -153,6 +152,28 @@ jobs:
             arguments: '--all-sources'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: native/go.mod
+          cache-dependency-path: native/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - name: Build Windows x64
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOPROXY=https://proxy.golang.org,direct
+          export GOSUMDB=sum.golang.org
+          python scripts/build_windows.py ${{ matrix.arguments }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.edition }}-windows
+          path: dist/windows/*
+          if-no-files-found: error
+          retention-days: 14
 
   ios:
     if: false
@@ -171,8 +192,8 @@ jobs:
       - uses: actions/checkout@v4
 
   release:
-    needs: [android]
-    if: always() && needs.android.result == 'success'
+    needs: [android, windows]
+    if: always() && needs.android.result == 'success' && needs.windows.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
