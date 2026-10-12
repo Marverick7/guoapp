@@ -347,6 +347,26 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 		return
 	}
 	if playlist && request.Method == http.MethodGet {
+		// [红果漫剧补丁] ftyp 预探测提前：上游 .m3u8 被 CDN 重定向成 MP4 直链时
+		//（实测：探针带 Range 得 206+mp4，无 Range 时 mp4 远超 4MB 清单上限），
+		// 必须在读全量前就识别，否则先撞「播放列表过大」的 502。
+		peekBytes, _ := reader.Peek(12)
+		if len(peekBytes) >= 12 && string(peekBytes[4:8]) == "ftyp" {
+			stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.m3u8_downgraded_to_mp4", Level: "warning", Message: "上游以 MP4 直链响应 .m3u8 地址，302 到 .mp4 别名", Host: asset.address})
+			alias := stream.nativeAsset(parts[0], session, nativeStreamAsset{
+				address:     asset.address,
+				contentType: "video/mp4",
+				etag:        asset.etag,
+				modified:    asset.modified,
+			})
+			if request.Method == http.MethodHead {
+				writer.Header().Set("Location", alias)
+				writer.WriteHeader(http.StatusFound)
+				return
+			}
+			http.Redirect(writer, request, alias, http.StatusFound)
+			return
+		}
 		body, err := io.ReadAll(io.LimitReader(reader, 4<<20+1))
 		if err != nil || len(body) > 4<<20 {
 			http.Error(writer, "播放列表过大或读取失败", http.StatusBadGateway)
@@ -354,30 +374,6 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 		}
 		text := strings.TrimSpace(strings.TrimPrefix(string(body), "\ufeff"))
 		if !strings.HasPrefix(text, "#EXTM3U") {
-			// [红果漫剧补丁] 上游 .m3u8 被 CDN 重定向/降级成 MP4 直链（ftyp 开头）。
-			// 此时 asset 键尾是 .m3u8 但内容是 MP4 —— 不再报错，直接按 MP4 透传：
-			// mpv + decryption_key 本来就能边下边解 CENC mp4。
-			if len(body) >= 12 && string(body[4:8]) == "ftyp" {
-				// [红果漫剧补丁] 上游以 MP4 直链响应 .m3u8 地址。
-				// 不在此处直传 MP4：URL 尾的 .m3u8 会让 mpv/lavf 误用 HLS demuxer 解析
-				// MP4 而失败。改为注册一个 .mp4 别名资产并 302 过去，
-				// mpv 跟随后按 MP4 demux + decryption_key 边下边解。
-				stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.m3u8_downgraded_to_mp4", Level: "warning", Message: "上游以 MP4 直链响应 .m3u8 地址，302 到 .mp4 别名", Host: asset.address})
-				alias := stream.nativeAsset(parts[0], session, nativeStreamAsset{
-					address:     asset.address,
-					contentType: "video/mp4",
-					etag:        asset.etag,
-					modified:    asset.modified,
-					total:       asset.total,
-				})
-				if request.Method == http.MethodHead {
-					writer.Header().Set("Location", alias)
-					writer.WriteHeader(http.StatusFound)
-					return
-				}
-				http.Redirect(writer, request, alias, http.StatusFound)
-				return
-			}
 			preview := text
 			if len(preview) > 96 {
 				preview = preview[:96]
