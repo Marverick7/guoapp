@@ -225,7 +225,9 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 // → 播放器跳集。此处对 .m3u8 拉取并填充 Playlist，让代理按 HLS 重写整集分片。
 func (d *Downloader) finalizeHongguoMedia(ctx context.Context, media providerMedia) (providerMedia, error) {
 	parsed, err := url.Parse(media.URL)
-	if err != nil || !strings.HasSuffix(strings.ToLower(parsed.Path), ".m3u8") {
+	isM3u8 := err == nil && strings.HasSuffix(strings.ToLower(parsed.Path), ".m3u8")
+	d.recordDiagnostic(diagnosticEvent{Event: "hongguo.finalize", Level: "info", Message: fmt.Sprintf("url尾=%s isM3u8=%v playlistLen=%d", media.URL[max(0, len(media.URL)-14):], isM3u8, len(media.Playlist))})
+	if !isM3u8 {
 		return media, nil
 	}
 	playlist, finalURL, err := d.fetchMediaPlaylist(ctx, media.URL, media.Referer)
