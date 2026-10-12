@@ -10,9 +10,15 @@ pluginManagement {
 
     // [红果漫剧补丁] 非ASCII路径(容器工作区)会让Gradle 9的included build路径编码错乱
     // (mojibake /workspace/çº¢æ)。优先用ASCII符号链接 /tmp/ft，避免 flutter.sdk 直写。
-    includeBuild("/tmp/ft/packages/flutter_tools/gradle")
-    // [红果漫剧补丁] 抢先注入 loader 用的 SDK 路径（ASCII），压掉后面读到的 mojibake 值
-    extensions.extraProperties.set("flutterSdkPath", "/tmp/ft")
+    // [红果漫剧补丁] 非ASCII工作区路径会让 Gradle 9 included-build 路径编码错乱（本地调试场景）。
+    // 本地容器用 /tmp/ft 符号链接规避；CI（GitHub runner 纯 ASCII 路径）走原有逻辑。
+    val ftLink = java.io.File("/tmp/ft/packages/flutter_tools/gradle")
+    if (ftLink.exists()) {
+        includeBuild(ftLink)
+        extensions.extraProperties.set("flutterSdkPath", "/tmp/ft")
+    } else {
+        includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+    }
 
     repositories {
         google()
