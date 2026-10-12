@@ -17,6 +17,7 @@ import 'source_status.dart';
 import 'ranking_models.dart';
 import 'cover_decoder.dart';
 import 'catalog_updates.dart';
+import 'diary_service.dart';
 import 'download_collections.dart';
 import 'resource_settings.dart';
 
@@ -263,6 +264,27 @@ class NativeRepository extends AppRepository {
     } finally {
       if (_activeReads[scope] == sequence) _activeReads.remove(scope);
     }
+  }
+
+  /// [红果漫剧补丁] 把 Go 核心诊断日志尾部回显到 Dart 日记（排障用）
+  Future<void> _dumpCoreLog() async {
+    try {
+      final directory = await getApplicationSupportDirectory();
+      final file = File('${directory.path}/logs/app.log');
+      if (!file.existsSync()) return;
+      final lines = (await file.readAsString())
+          .split('\n')
+          .where((l) => l.contains('hongguo.'))
+          .toList();
+      final show = lines.length > 5 ? lines.sublist(lines.length - 5) : lines;
+      for (final line in show) {
+        final m = RegExp('"event":"([^"]+)"').firstMatch(line);
+        final msg = RegExp('"message":"([^"]*)"').firstMatch(line);
+        if (m != null) {
+          DiaryService.add('[Core] ${m.group(1)}: ${msg?.group(1) ?? ''}');
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _cancelReads(String prefix) async {
@@ -587,6 +609,9 @@ class NativeRepository extends AppRepository {
           response['error'] as String? ?? '读取失败，请重试',
           code: response['code'] as String? ?? '',
         );
+      }
+      if (input['action'] == 'resolve' || input['action'] == 'fallback') {
+        unawaited(_dumpCoreLog());
       }
       final data = response['data'];
       if (!unrestricted && epoch != access?.profileEpoch) {
