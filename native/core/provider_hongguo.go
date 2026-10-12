@@ -200,6 +200,7 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	}
 	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
 	if nativeErr == nil {
+		d.recordDiagnostic(diagnosticEvent{Event: "hongguo.route", Level: "info", Message: fmt.Sprintf("app路成功 url尾=%s playlistLen=%d", media.URL[max(0, len(media.URL)-16):], len(media.Playlist))})
 		return d.finalizeHongguoMedia(ctx, media)
 	}
 	if err := ctx.Err(); err != nil {
@@ -207,6 +208,7 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	}
 	media, pageErr := d.resolveHongguoWebMedia(ctx, seriesID, videoID)
 	if pageErr == nil {
+		d.recordDiagnostic(diagnosticEvent{Event: "hongguo.route", Level: "info", Message: fmt.Sprintf("网页路成功 url尾=%s playlistLen=%d", media.URL[max(0, len(media.URL)-16):], len(media.Playlist))})
 		return d.finalizeHongguoMedia(ctx, media)
 	}
 	if err := ctx.Err(); err != nil {
@@ -214,6 +216,7 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	}
 	media, apiErr := d.resolveHongguoPlaybackAPI(ctx, seriesID, videoID)
 	if apiErr == nil {
+		d.recordDiagnostic(diagnosticEvent{Event: "hongguo.route", Level: "info", Message: fmt.Sprintf("djapi路成功 url尾=%s playlistLen=%d", media.URL[max(0, len(media.URL)-16):], len(media.Playlist))})
 		return d.finalizeHongguoMedia(ctx, media)
 	}
 	return providerMedia{}, fmt.Errorf("红果 App 取流失败：%v；网页取流失败：%v；备用取流失败：%w", publicError(nativeErr), publicError(pageErr), apiErr)
