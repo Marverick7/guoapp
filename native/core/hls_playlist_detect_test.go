@@ -16,9 +16,10 @@ func TestPlaylistDetectionWithHlsKey(t *testing.T) {
 			strings.HasSuffix(finalPath, ".m4s") || strings.HasSuffix(finalPath, ".aac") ||
 			strings.HasSuffix(finalPath, ".m4a") || strings.HasSuffix(finalPath, ".mp3") ||
 			strings.HasSuffix(finalPath, ".vtt")
-		return strings.Contains(assetContentType, "mpegurl") || strings.Contains(upstreamContentType, "mpegurl") ||
-			strings.Contains(finalPath, "m3u8") || strings.Contains(finalPath, "hls") ||
-			(sessionKeyLen > 0 && !mediaExt)
+		return !mediaExt && (strings.Contains(assetContentType, "mpegurl") ||
+			strings.Contains(upstreamContentType, "mpegurl") ||
+			strings.HasSuffix(finalPath, ".m3u8") || strings.Contains(finalPath, "m3u8") ||
+			(sessionKeyLen > 0 && !strings.Contains(finalPath, ".")))
 	}
 
 	cases := []struct {
@@ -40,6 +41,11 @@ func TestPlaylistDetectionWithHlsKey(t *testing.T) {
 		{"普通源-m3u8", "", "", "/x/index.m3u8", 0, true},
 		// 红果 CENC 源（mp4 直链，query 里有巧合 "hls" 子串但 path 干净）
 		{"红果-mp4直链", "video/mp4", "video/mp4", "/video/tos/cn/xxx/", 0, false},
+		// ★ 剧果：分片路径含 /hls/ 目录名 + .ts 扩展名，绝不能判为清单
+		{"剧果-hls目录下ts分片", "", "video/mp2t", "/hls/10362/480/seg-014.ts", 0, false},
+		{"剧果-hls目录下ts分片带key", "", "video/mp2t", "/hls/1/2/seg-1.ts", 16, false},
+		{"剧果-主清单", "", "application/vnd.apple.mpegurl", "/hls/10362/480/index.m3u8", 0, true},
+		{"剧果-无扩展名清单", "", "", "/hls/10362/480/playlist", 16, true},
 	}
 	for _, tc := range cases {
 		got := detect(tc.assetCT, tc.upCT, tc.path, tc.keyLen)

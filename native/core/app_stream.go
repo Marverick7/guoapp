@@ -103,10 +103,14 @@ func (stream *nativeStreamServer) nativeOpen(media providerMedia) (string, strin
 	// 假 .m3u8 尾 → mpv 用 HLS demuxer 解 MP4 → seek 全失败 → 播放器跳集。
 	pathIsM3u8 := false
 	if parsed, err := url.Parse(media.URL); err == nil {
-		// 只看 path：既覆盖 .m3u8 后缀，也覆盖 /hls/ 路径，但不误命中 query 里
-		// base64 参数的巧合子串（红果 CDN 的 mp4 直链就在 query 第 415 位含 "hls"）。
+		// [红果漫剧补丁] 只看 path 且【排除媒体扩展名】：
+		// /hls/ 目录名 + .ts 分片 ≠ 清单（剧果分片就是 /hls/10362/480/seg-014.ts）。
 		pathLower := strings.ToLower(parsed.Path)
-		pathIsM3u8 = strings.Contains(pathLower, "m3u8") || strings.Contains(pathLower, "hls")
+		hasMediaExt := strings.HasSuffix(pathLower, ".ts") || strings.HasSuffix(pathLower, ".mp4") ||
+			strings.HasSuffix(pathLower, ".m4s") || strings.HasSuffix(pathLower, ".aac") ||
+			strings.HasSuffix(pathLower, ".m4a") || strings.HasSuffix(pathLower, ".mp3")
+		pathIsM3u8 = !hasMediaExt &&
+			(strings.Contains(pathLower, "m3u8") || strings.Contains(pathLower, "hls"))
 	}
 	isHLS := media.Playlist != "" || len(media.HLSKey) > 0 || pathIsM3u8
 	if isHLS {
@@ -344,18 +348,19 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	// [红果漫剧补丁] 同 nativeOpen：只认 path 后缀与 mpegurl content-type，
 	// 不用 URL 任意位置子串（会误命中 base64 参数里的巧合子串）。
 	finalPath := strings.ToLower(finalURL.Path)
-	// [红果漫剧补丁] HLS AES-128 源（黄豆/剧果/黄果等）的 session.key 非空（16 字节），
-	// 但该 key 是给【清单内 #EXT-X-KEY 的 key URI】用的，不代表当前 asset 是清单。
-	// 旧判定 `|| len(session.key) > 0` 让 .ts 分片也被当成 m3u8 清单 → 读全量后校验
-	// #EXTM3U 失败 → 502 → ffmpeg crypto 协议 Unable to open resource。
-	// 新判定：session.key 只作为【兜底信号】，且必须 path 无已知媒体扩展名才算清单。
+	// [红果漫剧补丁] 清单判定（多轮踩坑后的最终版）：
+	//  1) HLS AES-128 源 session.key 非空，但那是给清单内 #EXT-X-KEY 用的，不是清单标志；
+	//  2) path 里的 "hls" 多为【目录名】（剧果分片 = /hls/10362/480/seg-014.ts），
+	//     不能作为清单依据，否则 .ts 分片会被当清单校验 #EXTM3U → 502；
+	//  3) 因此：以【媒体扩展名】为最高优先级排除，再看 contentType / .m3u8 后缀。
 	mediaExt := strings.HasSuffix(finalPath, ".ts") || strings.HasSuffix(finalPath, ".mp4") ||
 		strings.HasSuffix(finalPath, ".m4s") || strings.HasSuffix(finalPath, ".aac") ||
 		strings.HasSuffix(finalPath, ".m4a") || strings.HasSuffix(finalPath, ".mp3") ||
 		strings.HasSuffix(finalPath, ".vtt")
-	playlist := strings.Contains(asset.contentType, "mpegurl") || strings.Contains(contentType, "mpegurl") ||
-		strings.Contains(finalPath, "m3u8") || strings.Contains(finalPath, "hls") ||
-		(len(session.key) > 0 && !mediaExt)
+	playlist := !mediaExt && (strings.Contains(asset.contentType, "mpegurl") ||
+		strings.Contains(contentType, "mpegurl") ||
+		strings.HasSuffix(finalPath, ".m3u8") || strings.Contains(finalPath, "m3u8") ||
+		(len(session.key) > 0 && !strings.Contains(finalPath, ".")))
 	reader := bufio.NewReader(response.Body)
 	if !playlist && request.Method == http.MethodGet {
 		peek, _ := reader.Peek(512)
