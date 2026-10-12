@@ -344,7 +344,18 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 	// [红果漫剧补丁] 同 nativeOpen：只认 path 后缀与 mpegurl content-type，
 	// 不用 URL 任意位置子串（会误命中 base64 参数里的巧合子串）。
 	finalPath := strings.ToLower(finalURL.Path)
-	playlist := strings.Contains(asset.contentType, "mpegurl") || strings.Contains(contentType, "mpegurl") || strings.Contains(finalPath, "m3u8") || strings.Contains(finalPath, "hls") || len(session.key) > 0
+	// [红果漫剧补丁] HLS AES-128 源（黄豆/剧果/黄果等）的 session.key 非空（16 字节），
+	// 但该 key 是给【清单内 #EXT-X-KEY 的 key URI】用的，不代表当前 asset 是清单。
+	// 旧判定 `|| len(session.key) > 0` 让 .ts 分片也被当成 m3u8 清单 → 读全量后校验
+	// #EXTM3U 失败 → 502 → ffmpeg crypto 协议 Unable to open resource。
+	// 新判定：session.key 只作为【兜底信号】，且必须 path 无已知媒体扩展名才算清单。
+	mediaExt := strings.HasSuffix(finalPath, ".ts") || strings.HasSuffix(finalPath, ".mp4") ||
+		strings.HasSuffix(finalPath, ".m4s") || strings.HasSuffix(finalPath, ".aac") ||
+		strings.HasSuffix(finalPath, ".m4a") || strings.HasSuffix(finalPath, ".mp3") ||
+		strings.HasSuffix(finalPath, ".vtt")
+	playlist := strings.Contains(asset.contentType, "mpegurl") || strings.Contains(contentType, "mpegurl") ||
+		strings.Contains(finalPath, "m3u8") || strings.Contains(finalPath, "hls") ||
+		(len(session.key) > 0 && !mediaExt)
 	reader := bufio.NewReader(response.Body)
 	if !playlist && request.Method == http.MethodGet {
 		peek, _ := reader.Peek(512)
