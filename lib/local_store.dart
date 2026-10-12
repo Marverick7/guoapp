@@ -182,6 +182,12 @@ class LocalStore extends ChangeNotifier {
     if (DateTime.now().isBefore(_retryAfter)) {
       throw StateError('密码输入过于频繁，请稍后再试');
     }
+    // [红果漫剧补丁] 密码凭据缺失时给出明确原因（此前会静默算出一个不匹配的哈希，
+    // 用户看到「密码不正确」但其实是本机没存住 salt/hash）。
+    if (_gateSalt.isEmpty || _gateHash.isEmpty) {
+      DiaryService.add('[Store] 密码校验失败：本机未保存 salt/hash（可能写盘失败）');
+      throw StateError('本机未保存密码凭据，请重新设置站源密码锁');
+    }
     final actual = await _pinHasher(pin, _gateSalt);
     var difference = actual.length ^ _gateHash.length;
     for (var i = 0; i < actual.length && i < _gateHash.length; i++) {
@@ -237,6 +243,7 @@ class LocalStore extends ChangeNotifier {
     _gateSalt = salt;
     _gateHash = hash;
     _sourcesUnlocked = true;
+    DiaryService.add('[Store] 已启用站源密码锁 saltLen=${salt.length} hashLen=${hash.length}');
     _notify();
   });
 
@@ -1256,8 +1263,23 @@ class LocalStore extends ChangeNotifier {
         : null;
     final previousId = _current;
     final previousLocked = locked;
+    // [红果漫剧补丁] 保留本机站源门锁状态：门锁不参与 LAN 同步，属于纯本机 UI 设置，
+    // 而自动 worker 每 8 秒 reload 一次；写盘稍有延迟就会被磁盘旧值冲掉
+    // （Windows 上表现为「解锁几秒后回退」）。内存态在任何情况下都不劣于磁盘旧值。
+    final previousGateEnabled = _gateEnabled;
+    final previousGateOff = _gateOff;
+    final previousGateSalt = _gateSalt;
+    final previousGateHash = _gateHash;
+    final previousUnlocked = _sourcesUnlocked;
     await preferences.reload();
     _initialize();
+    if (_configurationError == null) {
+      _gateEnabled = previousGateEnabled;
+      _gateOff = previousGateOff;
+      _gateSalt = previousGateSalt;
+      _gateHash = previousGateHash;
+      _sourcesUnlocked = previousUnlocked;
+    }
     if (_configurationError == null &&
         previousProfiles == _string('profiles') &&
         previousId == _current) {

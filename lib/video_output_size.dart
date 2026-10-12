@@ -56,7 +56,11 @@ class VideoOutputSizeAdapter {
     _target = normalized;
     if (Platform.isAndroid) {
       await _resizeAndroid();
-    } else if (changed || normalized == null) {
+    } else if (changed) {
+      // [红果漫剧补丁] 只在【尺寸真的变化】时才 setSize。
+      // 旧代码 `changed || normalized == null` 会在每次 mediaReady 时无条件
+      // 调 setSize(null,null) —— Windows 上会重置 VideoOutputManager 尺寸，
+      // 而 D3D 纹理已按旧尺寸分配 → 显示区露未初始化纹理（绿边）。
       await video.setSize(
         width: normalized?.width.toInt(),
         height: normalized?.height.toInt(),

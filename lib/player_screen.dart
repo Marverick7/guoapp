@@ -1805,6 +1805,10 @@ class _PlayerScreenState extends State<PlayerScreen>
                 Video(
                   controller: _video!,
                   fit: BoxFit.contain,
+                  // [红果漫剧补丁] 显式黑底：Windows 上纹理尺寸与视频帧不一致时
+                  // letterbox 区域会露出未初始化的 D3D 纹理（绿色），
+                  // media_kit 的 fill 参数就是这个背景色的官方出口。
+                  fill: Colors.black,
                   controls: (_) => layeredControls,
                 ),
               if (_loading && !hideOverlayForPictureInPicture)
