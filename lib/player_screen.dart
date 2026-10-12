@@ -1039,7 +1039,13 @@ class _PlayerScreenState extends State<PlayerScreen>
               await platform.setProperty('demuxer-max-back-bytes', '${1 * 1024 * 1024}');
               await platform.setProperty('demuxer-readahead-secs', '5');
             } else {
-              await platform.setProperty('hwdec', 'auto-safe');
+              // [红果漫剧补丁] 无GPU环境（redroid/部分模拟器）强制软解，真机不受影响
+              // （bool.fromEnvironment('HG_FORCE_SW_DECODE') 仅在冒烟构建时传 true）
+              const forceSw = bool.fromEnvironment('HG_FORCE_SW_DECODE');
+              // auto-copy: 硬解到内存再交给 libmpv render —— 兼容无 surface 的
+              // libmpv render 场景（redroid/模拟器），真机同样受益（避免 mediacodec_embed
+              // 的 surface 依赖），性能差异可忽略。
+              await platform.setProperty('hwdec', forceSw ? 'no' : 'auto-copy');
               await platform.setProperty('hwdec-codecs', 'all');
               await platform.setProperty('vd-lavc-skiploopfilter', 'nonkey');
               await platform.setProperty('vd-lavc-threads', '4');

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class BuildVariant:
     all_sources: bool = False
+    extra_dart_defines: tuple = ()   # [红果漫剧补丁] 本地冒烟用额外 dart-define（如 HG_FORCE_SW_DECODE）
 
     @property
     def name(self):
@@ -20,7 +21,8 @@ class BuildVariant:
 
     @property
     def flutter_arguments(self):
-        return ['--dart-define=ALL_SOURCES=' + str(self.all_sources).lower()]
+        return ['--dart-define=ALL_SOURCES=' + str(self.all_sources).lower()] + [
+            '--dart-define=' + item for item in self.extra_dart_defines]
 
     @property
     def linker_flags(self):
@@ -41,3 +43,5 @@ class BuildVariant:
 def add_variant_argument(parser):
     parser.add_argument('--all-sources', action='store_true',
                         help='构建包含全部站源的真果鉴；默认构建仅红果的红果鉴')
+    parser.add_argument('--dart-define', action='append', dest='extra_dart_defines',
+                        default=[], help='额外透传给 flutter build 的 dart-define（KEY=VALUE）')
