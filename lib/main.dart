@@ -25,7 +25,7 @@ import 'diary_service.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  DiaryService.add('[App] 应用启动，版本: 0.2.85+92, 平台: ${Platform.operatingSystem}');
+  DiaryService.add('[App] 应用启动，版本: 0.2.86+93, 平台: ${Platform.operatingSystem}');
   if (Platform.isAndroid) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemBars(Brightness.dark));
@@ -114,14 +114,18 @@ class _AppBootstrapState extends State<AppBootstrap>
       error = null;
     });
     try {
-      final preferences = await SharedPreferences.getInstance();
-      // [红果漫剧补丁] 取本地存储目录，供「无法保存」时向用户展示具体路径
-      // （Windows 上 shared_preferences 落在 %APPDATA%\<app>\ 下）
+      // [红果漫剧补丁] 先确保存储目录存在再取 SharedPreferences：
+      // Windows 上 shared_preferences 的 JSON 落在应用支持目录，
+      // 目录不存在时写入会失败（表现为「解锁后几秒回退」「无法保存」）。
       String storagePath = '';
       try {
         final support = await getApplicationSupportDirectory();
+        await support.create(recursive: true);
         storagePath = support.path;
-      } catch (_) {}
+      } catch (error) {
+        DiaryService.add('[Store] 存储目录准备失败: $error');
+      }
+      final preferences = await SharedPreferences.getInstance();
       await _refreshDevice();
       await repository.initialize();
       if (mounted) {
