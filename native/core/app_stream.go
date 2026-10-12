@@ -358,14 +358,24 @@ func (stream *nativeStreamServer) nativeServe(writer http.ResponseWriter, reques
 			// 此时 asset 键尾是 .m3u8 但内容是 MP4 —— 不再报错，直接按 MP4 透传：
 			// mpv + decryption_key 本来就能边下边解 CENC mp4。
 			if len(body) >= 12 && string(body[4:8]) == "ftyp" {
-				stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.m3u8_downgraded_to_mp4", Level: "warning", Message: "上游以 MP4 直链响应 .m3u8 地址，已按 MP4 透传", Host: asset.address})
-				writer.Header().Set("Content-Type", "video/mp4")
-				writer.Header().Set("Accept-Ranges", "bytes")
+				// [红果漫剧补丁] 上游以 MP4 直链响应 .m3u8 地址。
+				// 不在此处直传 MP4：URL 尾的 .m3u8 会让 mpv/lavf 误用 HLS demuxer 解析
+				// MP4 而失败。改为注册一个 .mp4 别名资产并 302 过去，
+				// mpv 跟随后按 MP4 demux + decryption_key 边下边解。
+				stream.downloader.recordDiagnostic(diagnosticEvent{Event: "stream.m3u8_downgraded_to_mp4", Level: "warning", Message: "上游以 MP4 直链响应 .m3u8 地址，302 到 .mp4 别名", Host: asset.address})
+				alias := stream.nativeAsset(parts[0], session, nativeStreamAsset{
+					address:     asset.address,
+					contentType: "video/mp4",
+					etag:        asset.etag,
+					modified:    asset.modified,
+					total:       asset.total,
+				})
 				if request.Method == http.MethodHead {
-					writer.WriteHeader(http.StatusOK)
+					writer.Header().Set("Location", alias)
+					writer.WriteHeader(http.StatusFound)
 					return
 				}
-				http.ServeContent(writer, request, "video.mp4", time.Time{}, bytes.NewReader(body))
+				http.Redirect(writer, request, alias, http.StatusFound)
 				return
 			}
 			preview := text
