@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -96,7 +97,11 @@ func (engine *nativeEngine) nativeOpenPlayback(ctx context.Context, choice nativ
 			return nativePlan{}, err
 		}
 		// [红果漫剧补丁] 打点：nativeOpen 实际收到的 URL 形态（定案 .m3u8 之谜）
-		engine.downloader.recordDiagnostic(diagnosticEvent{Event: "hongguo.native_open", Level: "info", Message: fmt.Sprintf("media.URL尾=%s playlistLen=%d", media.URL[max(0, len(media.URL)-16):], len(media.Playlist))})
+		// [红果漫剧补丁] 定位 isHLS 误判：报告 URL 中 m3u8/hls 子串位置
+		lower := strings.ToLower(media.URL)
+		m3u8At := strings.Index(lower, "m3u8")
+		hlsAt := strings.Index(lower, "hls")
+		engine.downloader.recordDiagnostic(diagnosticEvent{Event: "hongguo.native_open", Level: "info", Message: fmt.Sprintf("urlLen=%d m3u8At=%d hlsAt=%d playlistLen=%d hlsKey=%d", len(media.URL), m3u8At, hlsAt, len(media.Playlist), len(media.HLSKey))})
 		plan.URL, choice.streamSession = stream.nativeOpen(media)
 	}
 	choice.created = time.Now()
