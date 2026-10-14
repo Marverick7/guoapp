@@ -35,8 +35,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      # 格式整理不在暂停范围内，格式漂移直接失败；分析与测试仍不阻塞出包。
       - run: dart format --output=none --set-exit-if-changed lib test integration_test test_driver
-        continue-on-error: true
       - run: dart analyze lib test integration_test test_driver
         continue-on-error: true
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg

@@ -79,6 +79,8 @@ Flutter 多端独立短剧 / 影视应用，原名「短剧库 APP」。站源�
 
 推送 `main` / `master`、`v*` 标签、提交 PR，或手动运行 **Build app packages**，会先检查再构建两版（默认与 `--all-sources`）：
 
+检查阶段中，`dart format` 与 `python3 -m unittest` 为硬门禁，不通过即终止；`dart analyze`、`flutter test`、`go test` 按「开发优先、集中验证暂缓」暂不阻塞出包，结果仍显示在运行详情里，恢复集中验证后改为门禁。
+
 | 产物 | 内容 |
 | --- | --- |
 | `*-android` | 三种架构 APK 和 SHA256 |
