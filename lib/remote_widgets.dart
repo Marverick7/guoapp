@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import 'search_input.dart';
 import 'package:flutter/services.dart';
 
 class RemoteTarget extends StatefulWidget {
@@ -795,7 +794,7 @@ class _TelevisionSearchDialogState extends State<TelevisionSearchDialog> {
                                       )
                                     : ListView.separated(
                                         itemCount: _results.length,
-                                        separatorBuilder: (_, __) =>
+                                        separatorBuilder: (_, _) =>
                                             const SizedBox(height: 6),
                                         itemBuilder: (context, index) {
                                           final item = _results[index];

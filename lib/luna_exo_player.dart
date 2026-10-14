@@ -2,9 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:media_kit/src/models/player_log.dart';
-import 'package:media_kit/src/models/player_stream.dart';
-import 'package:media_kit/src/player/platform_player.dart';
 import 'package:video_player/video_player.dart';
 import 'diary_service.dart';
 

@@ -71,7 +71,6 @@ class PlayerInteractions extends ChangeNotifier {
   GestureHudState _hudState = const GestureHudState();
   double _brightness = 0.5;
   double _initialBrightness = 0.5;
-  double _viewWidth = 0.0;
   double _viewHeight = 0.0;
   Timer? _hudTimer;
 
@@ -186,7 +185,6 @@ class PlayerInteractions extends ChangeNotifier {
     _started = event.timeStamp;
     _swipeEnabled = swipeEnabled && event.kind == PointerDeviceKind.touch;
     _swipeThreshold = math.max(30, math.min(80, height * .08));
-    _viewWidth = width;
     _viewHeight = height;
     _moved = _held = false;
     _swipeAction = SwipeAction.none;

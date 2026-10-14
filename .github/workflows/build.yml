@@ -35,10 +35,9 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      # 格式整理不在暂停范围内，格式漂移直接失败；分析与测试仍不阻塞出包。
+      # 格式整理与静态分析不在暂停范围内，漂移或新问题直接失败；测试仍不阻塞出包。
       - run: dart format --output=none --set-exit-if-changed lib test integration_test test_driver
-      - run: dart analyze lib test integration_test test_driver
-        continue-on-error: true
+      - run: dart analyze --fatal-infos lib test integration_test test_driver
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       # 测试当前不阻塞出包（开发优先、集中验证暂缓），结果仍会显示在运行详情里。
       - run: flutter test --dart-define=DISABLE_REMOTE_IMAGES=true
