@@ -134,14 +134,22 @@ class _PlayerScreenState extends State<PlayerScreen>
   AppOrientationController? _orientationController;
   bool get _pictureInPictureVisible =>
       _pictureInPictureActive || _pictureInPictureRequested;
+  bool get _mobilePlatform =>
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
   bool get _canUsePictureInPicture =>
       !_television &&
       defaultTargetPlatform == TargetPlatform.android &&
       _pictureInPictureSupported;
-  bool get _mobile =>
-      !_television &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
+  bool get _mobile => !_television && _mobilePlatform;
+  bool get _lifecycleVisible {
+    if (_pictureInPictureVisible) return true;
+    if (_mobilePlatform) {
+      return _lifecycleState == AppLifecycleState.resumed;
+    }
+    return _lifecycleState == AppLifecycleState.resumed ||
+        _lifecycleState == AppLifecycleState.inactive;
+  }
   VideoEnhancementController? get _enhancementForUi =>
       _enhancement.supported ? _enhancement : null;
   PlaybackPreferences get _preferences => PlaybackPreferences(
@@ -464,9 +472,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   void _applyLifecycleVisibility({bool pauseWhenHidden = true}) {
-    final visible =
-        _lifecycleState == AppLifecycleState.resumed ||
-        _pictureInPictureVisible;
+    final visible = _lifecycleVisible;
     _foreground = visible;
     _enhancement.setForeground(_foreground);
     _syncDanmaku();
