@@ -998,8 +998,8 @@ class _PlayerControlsState extends State<PlayerControls> {
         final icon = value < 0.33
             ? Icons.brightness_low_rounded
             : value < 0.66
-                ? Icons.brightness_medium_rounded
-                : Icons.brightness_high_rounded;
+            ? Icons.brightness_medium_rounded
+            : Icons.brightness_high_rounded;
         return IgnorePointer(
           child: Center(
             child: Container(
@@ -1008,7 +1008,10 @@ class _PlayerControlsState extends State<PlayerControls> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: .75),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: .15), width: 1),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: .15),
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: .4),
@@ -1030,7 +1033,9 @@ class _PlayerControlsState extends State<PlayerControls> {
                       child: LinearProgressIndicator(
                         value: value,
                         backgroundColor: Colors.white24,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
                       ),
                     ),
                   ),

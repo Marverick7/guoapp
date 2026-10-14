@@ -128,8 +128,9 @@ class _DetailScreenState extends State<DetailScreen> {
           final watched = widget.store.watched(merged.id);
           int resumeAt = 0;
           if (watched != null) {
-            final current = detail.episodes
-                .indexWhere((item) => item.number == watched.episode);
+            final current = detail.episodes.indexWhere(
+              (item) => item.number == watched.episode,
+            );
             if (current >= 0) resumeAt = current;
           }
           unawaited(_play(resumeAt, resume: true));
@@ -323,7 +324,9 @@ class _DetailScreenState extends State<DetailScreen> {
     if (watched == null) {
       resumeIndex = 0;
     } else {
-      final current = episodes.indexWhere((item) => item.number == watched.episode);
+      final current = episodes.indexWhere(
+        (item) => item.number == watched.episode,
+      );
       resumeIndex = current >= 0 ? current : 0;
     }
     final television = AppLayout.isTelevision(context);

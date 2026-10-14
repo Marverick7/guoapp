@@ -98,8 +98,10 @@ Future<String> hashProfilePin(String pin, String salt) async {
   // 若仍失败则退回当前 isolate 直接计算（120k 轮约 1-3 秒，可接受）。
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     try {
-      return await compute(_derivePinEntry, _PinInput(pin, salt))
-          .timeout(const Duration(seconds: 30));
+      return await compute(
+        _derivePinEntry,
+        _PinInput(pin, salt),
+      ).timeout(const Duration(seconds: 30));
     } catch (_) {
       return _derivePin(pin, salt);
     }

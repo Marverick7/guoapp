@@ -243,7 +243,9 @@ class LocalStore extends ChangeNotifier {
     _gateSalt = salt;
     _gateHash = hash;
     _sourcesUnlocked = true;
-    DiaryService.add('[Store] 已启用站源密码锁 saltLen=${salt.length} hashLen=${hash.length}');
+    DiaryService.add(
+      '[Store] 已启用站源密码锁 saltLen=${salt.length} hashLen=${hash.length}',
+    );
     _notify();
   });
 

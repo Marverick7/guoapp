@@ -126,7 +126,10 @@ class DiaryService {
                 onPressed: () => copyToClipboard(dialogContext),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.white70),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.white70,
+                ),
                 tooltip: '清空日记',
                 onPressed: () => clear(),
               ),
@@ -149,7 +152,10 @@ class DiaryService {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: SelectableText(
                         '日志文件：$pathText',
-                        style: const TextStyle(color: Colors.white54, fontSize: 11),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
                       ),
                     );
                   },
@@ -167,72 +173,67 @@ class DiaryService {
   static Widget _buildEntryList(BuildContext dialogContext) {
     final scrollController = ScrollController();
     return AnimatedBuilder(
-              animation: revision,
-              builder: (context, _) {
-                final list = entries;
-                if (list.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      '暂无日记记录',
-                      style: TextStyle(color: Colors.white38),
-                    ),
-                  );
+      animation: revision,
+      builder: (context, _) {
+        final list = entries;
+        if (list.isEmpty) {
+          return const Center(
+            child: Text('暂无日记记录', style: TextStyle(color: Colors.white38)),
+          );
+        }
+        return Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Scrollbar(
+            controller: scrollController,
+            thumbVisibility: true,
+            child: ListView.builder(
+              controller: scrollController,
+              itemCount: list.length,
+              itemBuilder: (context, index) {
+                final item = list[list.length - 1 - index]; // 倒序显示最新
+                Color textColor = Colors.white70;
+                final lower = item.toLowerCase();
+                if (lower.contains('err') ||
+                    lower.contains('fail') ||
+                    lower.contains('异常') ||
+                    lower.contains('失败') ||
+                    lower.contains('exception')) {
+                  textColor = const Color(0xFFFF6B6B);
+                } else if (lower.contains('成功') ||
+                    lower.contains('ok') ||
+                    lower.contains('success')) {
+                  textColor = const Color(0xFF51CF66);
+                } else if (lower.contains('open') ||
+                    lower.contains('initialize') ||
+                    lower.contains('play') ||
+                    lower.contains('url')) {
+                  textColor = const Color(0xFF74C0FC);
+                } else if (lower.contains('warn') ||
+                    lower.contains('403') ||
+                    lower.contains('404')) {
+                  textColor = const Color(0xFFFCC419);
                 }
-                return Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  child: Scrollbar(
-                    controller: scrollController,
-                    thumbVisibility: true,
-                    child: ListView.builder(
-                      controller: scrollController,
-                      itemCount: list.length,
-                      itemBuilder: (context, index) {
-                        final item = list[list.length - 1 - index]; // 倒序显示最新
-                        Color textColor = Colors.white70;
-                        final lower = item.toLowerCase();
-                        if (lower.contains('err') ||
-                            lower.contains('fail') ||
-                            lower.contains('异常') ||
-                            lower.contains('失败') ||
-                            lower.contains('exception')) {
-                          textColor = const Color(0xFFFF6B6B);
-                        } else if (lower.contains('成功') ||
-                            lower.contains('ok') ||
-                            lower.contains('success')) {
-                          textColor = const Color(0xFF51CF66);
-                        } else if (lower.contains('open') ||
-                            lower.contains('initialize') ||
-                            lower.contains('play') ||
-                            lower.contains('url')) {
-                          textColor = const Color(0xFF74C0FC);
-                        } else if (lower.contains('warn') ||
-                            lower.contains('403') ||
-                            lower.contains('404')) {
-                          textColor = const Color(0xFFFCC419);
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2.0),
-                          child: SelectableText(
-                            item,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                              color: textColor,
-                            ),
-                          ),
-                        );
-                      },
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                  child: SelectableText(
+                    item,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: textColor,
                     ),
                   ),
                 );
               },
+            ),
+          ),
+        );
+      },
     );
   }
 }

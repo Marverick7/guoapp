@@ -150,6 +150,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     return _lifecycleState == AppLifecycleState.resumed ||
         _lifecycleState == AppLifecycleState.inactive;
   }
+
   VideoEnhancementController? get _enhancementForUi =>
       _enhancement.supported ? _enhancement : null;
   PlaybackPreferences get _preferences => PlaybackPreferences(
@@ -1041,8 +1042,14 @@ class _PlayerScreenState extends State<PlayerScreen>
               await platform.setProperty('vd-lavc-skiploopfilter', 'all');
               await platform.setProperty('vd-lavc-skipidct', 'all');
               await platform.setProperty('vd-lavc-threads', '2');
-              await platform.setProperty('demuxer-max-bytes', '${4 * 1024 * 1024}');
-              await platform.setProperty('demuxer-max-back-bytes', '${1 * 1024 * 1024}');
+              await platform.setProperty(
+                'demuxer-max-bytes',
+                '${4 * 1024 * 1024}',
+              );
+              await platform.setProperty(
+                'demuxer-max-back-bytes',
+                '${1 * 1024 * 1024}',
+              );
               await platform.setProperty('demuxer-readahead-secs', '5');
             } else {
               // [红果漫剧补丁] 无GPU环境（redroid/部分模拟器）强制软解，真机不受影响
@@ -1052,7 +1059,10 @@ class _PlayerScreenState extends State<PlayerScreen>
               // 省电低占用；redroid/模拟器无 mediacodec 服务 → mpv 自动回落软解，无损。
               // （v0.2.68 的 auto-copy 实测在真机上先试 mediacodec 非copy变体 →
               //   surface NULL → 放弃硬解回落软解，费电。精确点名 _copy 变体解决。）
-              await platform.setProperty('hwdec', forceSw ? 'no' : 'mediacodec_copy');
+              await platform.setProperty(
+                'hwdec',
+                forceSw ? 'no' : 'mediacodec_copy',
+              );
               await platform.setProperty('hwdec-codecs', 'all');
               await platform.setProperty('vd-lavc-skiploopfilter', 'nonkey');
               await platform.setProperty('vd-lavc-threads', '4');
@@ -1079,9 +1089,11 @@ class _PlayerScreenState extends State<PlayerScreen>
         _plan = plan;
         installed = true;
         _acceptErrors = true;
-        DiaryService.add('[Play] open(${plan.routeIndex + 1}/${plan.routeCount}) url=${plan.url} '
-            'key=${plan.decryptionKey.isEmpty ? '无' : '有(${plan.decryptionKey.length}hex)'} '
-            'quality=${plan.quality} local=${plan.local} headers=${plan.headers.keys.toList()}');
+        DiaryService.add(
+          '[Play] open(${plan.routeIndex + 1}/${plan.routeCount}) url=${plan.url} '
+          'key=${plan.decryptionKey.isEmpty ? '无' : '有(${plan.decryptionKey.length}hex)'} '
+          'quality=${plan.quality} local=${plan.local} headers=${plan.headers.keys.toList()}',
+        );
         await _player.open(
           Media(
             plan.url,
@@ -1486,19 +1498,20 @@ class _PlayerScreenState extends State<PlayerScreen>
   // [红果漫剧补丁] 本地代理自检探针
   HttpClient? _probeClient;
   Future<void> _probeProxy(String error) async {
-    final match = RegExp(r'http://127\.0\.0\.1:\d+/[A-Za-z0-9/.]+(?<![.,;:!?])')
-        .firstMatch(error);
+    final match = RegExp(
+      r'http://127\.0\.0\.1:\d+/[A-Za-z0-9/.]+(?<![.,;:!?])',
+    ).firstMatch(error);
     if (match == null) return;
     final url = match.group(0)!;
     _probeClient?.close(force: true);
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 3);
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
     _probeClient = client;
     try {
       final request = await client.getUrl(Uri.parse(url));
       request.headers.set('Range', 'bytes=0-256');
-      final response =
-          await request.close().timeout(const Duration(seconds: 6));
+      final response = await request.close().timeout(
+        const Duration(seconds: 6),
+      );
       final builder = BytesBuilder();
       await for (final chunk in response) {
         builder.add(chunk);
@@ -1506,10 +1519,11 @@ class _PlayerScreenState extends State<PlayerScreen>
       }
       // 注意：不要 drain！await-for break 后订阅已取消，drain 会二次 listen 抛
       // "Stream has already been listened to"，把已拿到的状态码/正文一起吞掉。
-      final body =
-          utf8.decode(builder.takeBytes(), allowMalformed: true);
-      DiaryService.add('[Probe] 代理自检: status=${response.statusCode} '
-          'ct=${response.headers.contentType} body=${body.isEmpty ? '(空)' : body}');
+      final body = utf8.decode(builder.takeBytes(), allowMalformed: true);
+      DiaryService.add(
+        '[Probe] 代理自检: status=${response.statusCode} '
+        'ct=${response.headers.contentType} body=${body.isEmpty ? '(空)' : body}',
+      );
     } catch (e) {
       DiaryService.add('[Probe] 代理自检失败: $e');
     } finally {
@@ -1846,7 +1860,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         FilledButton.tonalIcon(
-                          onPressed: () => DiaryService.showDiaryDialog(context),
+                          onPressed: () =>
+                              DiaryService.showDiaryDialog(context),
                           icon: const Icon(Icons.receipt_long_rounded),
                           label: const Text('查看播放日记'),
                         ),
@@ -1857,8 +1872,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                             label: const Text('改为在线播放'),
                           )
                         else if (!_localFailure &&
-                              !widget.localOnly &&
-                              widget.repository.supportsSourceManagement)
+                            !widget.localOnly &&
+                            widget.repository.supportsSourceManagement)
                           SourceDiagnosticsButton(
                             repository: widget.repository,
                             store: widget.store,

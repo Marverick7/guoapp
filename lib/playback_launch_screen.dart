@@ -41,8 +41,9 @@ Future<void> openPlaybackDirectly(
     if (watched == null) {
       index = 0;
     } else {
-      final current = merged.episodes
-          .indexWhere((item) => item.number == watched.episode);
+      final current = merged.episodes.indexWhere(
+        (item) => item.number == watched.episode,
+      );
       index = current >= 0 ? current : 0;
     }
     final episode = merged.episodes[index];
